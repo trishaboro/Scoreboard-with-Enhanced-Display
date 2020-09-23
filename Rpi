@@ -1,0 +1,900 @@
+from socket import AF_INET, socket, SOCK_STREAM
+from threading import Thread
+import tkinter as tk
+from datetime import *
+import mysql.connector
+import threading
+import time
+import os
+import subprocess
+
+mydb = mysql.connector.connect(
+  host="localhost",
+  user="exampleuser",
+  passwd="pimylifeup",
+  database="exampledb"
+)
+
+curs = mydb.cursor()
+
+query= "CREATE TABLE IF NOT EXISTS basketball_db (id INT AUTO_INCREMENT PRIMARY KEY, name1 VARCHAR(255), name2 VARCHAR(255), score1 INT, score2 INT, foul1 INT, foul2 INT, timeout1 INT, timeout2 INT, shotclock INT, gameclock_min INT, gameclock_sec INT, quarter INT);"
+curs.execute(query)
+
+query= "CREATE TABLE IF NOT EXISTS badminton_db (id INT AUTO_INCREMENT PRIMARY KEY, name1 VARCHAR(255), name2 VARCHAR(255), name3 VARCHAR(255), name4 VARCHAR(255), score1 INT, score2 INT, setwon1 INT, setwon2 INT, quarter INT);"
+curs.execute(query)
+
+query= "CREATE TABLE IF NOT EXISTS volleyball_db (id INT AUTO_INCREMENT PRIMARY KEY, name1 VARCHAR(255), name2 VARCHAR(255), score1 INT, score2 INT, score1_s1 INT, score2_s1 INT, score1_s2 INT, score2_s2 INT, score1_s3 INT, score2_s3 INT, score1_s4 INT, score2_s4 INT, score1_s5 INT, score2_s5 INT, setwon1 INT, setwon2 INT, timeout1 INT, timeout2 INT);"
+curs.execute(query)
+
+query= "SELECT * FROM basketball_db WHERE id=(SELECT MAX(id) FROM basketball_db);"
+curs.execute(query)
+s= curs.fetchall()
+bb_p1_name= s[0][1]
+bb_p2_name= s[0][2]
+bb_p1_score= s[0][3]
+bb_p2_score= s[0][4]
+bb_p1_foul= s[0][5]
+bb_p2_foul= s[0][6]
+bb_p1_timeout= s[0][7]
+bb_p2_timeout= s[0][8]
+bb_sclock= s[0][9]
+bb_minutes= s[0][10]
+bb_seconds= s[0][11]
+bb_quarter= s[0][12]
+
+query= "SELECT * FROM badminton_db WHERE id=(SELECT MAX(id) FROM badminton_db);"
+curs.execute(query)
+x= curs.fetchall()
+
+bd_p1_name = x[0][1]
+bd_p2_name = x[0][2]
+bd_p1b_name = x[0][3]
+bd_p2b_name = x[0][4]
+bd_p1_score = x[0][5]
+bd_p2_score = x[0][6]
+bd_p1_setwon = x[0][7]
+bd_p2_setwon = x[0][8]
+bd_quarter = x[0][9]
+
+boardisPresent = True
+bb_boardisPresent = True
+vb_boardisPresent = True
+
+bb_gclock_mins = 0
+bb_gclock_secs = 0
+bb_state = False
+bb_mins = 0
+bb_secs = 0
+
+vb_p1_name = "TEAM AA"
+vb_p2_name = "TEAM BB"
+vb_p1_score = 0
+vb_p2_score = 0
+vb_p1_score_s1= 0
+vb_p1_score_s2= 0
+vb_p1_score_s3= 0
+vb_p1_score_s4= 0
+vb_p1_score_s5= 0
+vb_p2_score_s1= 0
+vb_p2_score_s2= 0
+vb_p2_score_s3= 0
+vb_p2_score_s4= 0
+vb_p2_score_s5= 0
+vb_gclock_mins = 0
+vb_gclock_secs = 0
+vb_basket_sclock = 0
+vb_quarter = 1
+vb_p1_setwon = 0
+vb_p2_setwon = 0
+vb_p1_timeout = 0
+vb_p2_timeout = 0
+
+def accept_incoming_connections():
+    """Sets up handling for incoming clients."""
+    while True:
+        client, client_address = SERVER.accept()
+        print("%s:%s has connected." % client_address)
+        addresses[client] = client_address
+        Thread(target=handle_client, args=(client,)).start()
+
+current_sport= ""
+def handle_client(client):  # Takes client socket as argument.
+    """Handles a single client connection."""
+    buffer = b''
+    word = ""
+    
+    global current_sport
+    try:
+        
+        while True:
+            word = client.recv(BUFSIZ)
+            buffer += word
+            data = buffer.decode('utf-8')
+            #print(data)
+            if not data:
+                break
+            if data == selectsport[0] or data == selectsport[1] or data == selectsport[2] or data == selectsport[3] :
+                current_sport= data
+                broadcast(data)
+                break
+            
+            if data == vb_choice[0] or data == vb_choice[1] or data == vb_choice[2] or data == vb_choice[3] or data == vb_choice[4] or data == vb_choice[5] or data == vb_choice[6] or data == vb_choice[7] or data[:10] == vb_choice[8] or data[:10] == vb_choice[9] or data == vb_choice[10] or data == vb_choice[11] or data == vb_choice[12] or data == vb_choice[13] or data == vb_choice[14] or data[:16] == vb_choice[15]:
+                Volley_CheckInput(current_sport, data)
+                break
+                
+            if data == bb_choice[0] or data == bb_choice[1] or data == bb_choice[2] or data == bb_choice[3] or data == bb_choice[4] or data == bb_choice[5] or data == bb_choice[6] or data[:10] == bb_choice[7] or data[:10] == bb_choice[8] or data == bb_choice[9] or data == bb_choice[10] or data == bb_choice[11] or data == bb_choice[12] or data == bb_choice[13] or data == bb_choice[14] or data == bb_choice[15] or data == bb_choice[16] or data == bb_choice[17] or data[:16] == bb_choice[18] or data[:9] == bb_choice[19] or data == bb_choice[20] or data == bb_choice[21]:
+                Basket_CheckInput(current_sport, data)
+                break
+            
+            if data == bd_choice[0] or data == bd_choice[1] or data == bd_choice[2] or data == bd_choice[3] or data == bd_choice[4] or data == bd_choice[5] or data[:10] == bd_choice[6] or data[:10] == bd_choice[7] or data[:10] == bd_choice[8] or data[:10] == bd_choice[9] or data == bd_choice[10] :
+                Badmin_CheckInput(current_sport, data)
+                break
+                
+    except KeyboardInterrupt:
+        print('Error')
+
+def broadcast(current_sport):
+    
+    """Display to GUI."""
+    global boardisPresent, bb_boardisPresent, vb_boardisPresent
+    
+    while current_sport == "badminton":
+        badmintonUI()
+        if bb_boardisPresent is False:
+            top.destroy()
+            bb_boardisPresent= True
+        if vb_boardisPresent is False:
+            vbboard.destroy()
+            vb_boardisPresent = True
+        break
+    
+    while current_sport == "basketball":
+        basketUI()
+        if boardisPresent is False:
+            board.destroy()
+            boardisPresent= True
+        if vb_boardisPresent is False:
+            vbboard.destroy()
+            vb_boardisPresent = True
+        break
+
+    while current_sport == "volleyball":
+        volleyballUI()
+        if bb_boardisPresent is False:  # IF BASKETBALL IS PRESENT
+            top.destroy()
+            bb_boardisPresent= True
+        if boardisPresent is False:  # IF BASKETBALL IS PRESENT
+            board.destroy()
+            boardisPresent= True
+        break
+        
+    while current_sport == "MainMenu":
+        if bb_boardisPresent is False:  # IF BASKETBALL IS PRESENT
+            top.destroy()
+            bb_boardisPresent= True
+        if boardisPresent is False:  # IF BASKETBALL IS PRESENT
+            board.destroy()
+            boardisPresent= True
+        if vb_boardisPresent is False:
+            vbboard.destroy()
+            vb_boardisPresent = True
+        
+        break
+
+def Basket_CheckInput(CurrentSport, msg):
+    global bb_p1_score, bb_p2_score, bb_p1_name, bb_p2_name, bb_p1_foul, bb_p2_foul, bb_p1_timeout, bb_p2_timeout, bb_quarter, bb_sclock, sclock_state, bb_minutes, bb_mins, bb_secs
+    
+    while CurrentSport == "basketball":
+        if msg == "bb_p1_Clear":
+            bb_p1_score = 0
+            BB_player1_score.config(text=bb_p1_score)
+            bb_p2_score = 0
+            BB_player2_score.config(text=bb_p2_score)
+            bb_p1_timeout = 0
+            bb_p2_timeout = 0
+            BB_player1_timeout.config(text=bb_p1_timeout)
+            BB_player2_timeout.config(text=bb_p2_timeout)
+            bb_p1_foul = 0
+            BB_player1_foul.config(text=bb_p1_foul)
+            bb_p2_foul = 0
+            BB_player2_foul.config(text=bb_p2_foul)
+            bb_quarter = 1
+            BB_quarter.config(text=bb_quarter)
+            basketball_restartTime()
+            basketball_pause()
+            bb_sclock = 24
+            bb_state= False
+            query= "TRUNCATE TABLE basketball_db"
+            curs.execute(query)
+            curs.execute("COMMIT;")
+            
+            query = """INSERT INTO basketball_db (name1, name2, score1, score2, foul1, foul2, timeout1 , timeout2 , shotclock , gameclock_min, gameclock_sec, quarter) VALUES ("{}", "{}", {}, {}, {}, {}, {}, {}, {}, {}, {}, {});"""
+            curs.execute(query.format(bb_p1_name, bb_p2_name, bb_p1_score, bb_p2_score, bb_p1_foul, bb_p2_foul, bb_p1_timeout, bb_p2_timeout, bb_sclock, bb_mins, bb_secs, bb_quarter))
+            curs.execute("COMMIT;")
+            if sclock_state is False:
+                shotclocktime()
+            break
+        if msg == "Stop_Time":
+            bb_state= False
+            basketball_pause()
+            basketball_restartTime()
+        if msg == "bb_p1_scorePlusOne":
+            bb_p1_score += 1
+            BB_player1_score.config(text=bb_p1_score)
+        if msg == "bb_p1_scorePlusTwo":
+            bb_p1_score += 2
+            BB_player1_score.config(text=bb_p1_score)
+            break
+        if msg == "bb_p1_scorePlusThree":
+            bb_p1_score += 3
+            BB_player1_score.config(text=bb_p1_score)
+            break
+        if msg == "bb_p2_scorePlusOne":
+            bb_p2_score += 1
+            BB_player2_score.config(text=bb_p2_score)
+            break
+        if msg == "bb_p2_scorePlusTwo":
+            bb_p2_score += 2
+            BB_player2_score.config(text=bb_p2_score)
+            break
+        if msg == "bb_p2_scorePlusThree":
+            bb_p2_score += 3
+            BB_player2_score.config(text=bb_p2_score)
+            break
+        if msg == "basket_pause":
+            basketball_pause()
+            break
+        if msg == "Start_Game":
+            basketball_start()
+            print("asdasdasdasd")
+            break
+        if msg[:16] == "bb_timeout_input":
+            bb_p1_timeout = int(msg[16:])
+            bb_p2_timeout = int(msg[16:])
+            BB_player1_timeout.config(text=bb_p1_timeout)
+            BB_player2_timeout.config(text=bb_p2_timeout)
+            break
+        if msg == "bb_p1_timeoutPlusOne":
+            bb_p1_timeout -= 1
+            BB_player1_timeout.config(text=bb_p1_timeout)
+            break
+        if msg == "bb_p2_timeoutPlusOne":
+            bb_p2_timeout -= 1
+            BB_player2_timeout.config(text=bb_p2_timeout)
+            break
+        if msg == "bb_p1_foulPlusOne":
+            bb_p1_foul += 1
+            BB_player1_foul.config(text=bb_p1_foul)
+            break
+        if msg == "bb_p2_foulPlusOne":
+            bb_p2_foul += 1
+            BB_player2_foul.config(text=bb_p2_foul)
+            break
+        if msg == "bb_quarterPlusOne":
+            bb_quarter += 1
+            bb_quar= str(bb_quarter)
+            if(bb_quarter > 4):
+                bb_quar= "OT"
+            BB_quarter.config(text=bb_quar)
+            basketball_restartTime()
+            break
+        if msg[:10] == "bb_p1_name":
+            bb_p1_name = msg[10:]
+            BB_player1_name.config(text=bb_p1_name)
+            
+            '''query= """INSERT INTO basketball_db (name1) VALUES ("{}");"""
+            curs.execute(query.format(bb_p1_name))
+            curs.execute("COMMIT;")'''
+            break
+            
+        if msg[:10] == "bb_p2_name":
+            bb_p2_name = msg[10:]
+            BB_player2_name.config(text=bb_p2_name)
+            break
+        if msg == "shotclock_14":
+            bb_sclock = 14
+            if sclock_state is False:
+                shotclocktime()
+            break
+        if msg == "shotclock_24":
+            bb_sclock = 24
+            if sclock_state is False:
+                shotclocktime()
+            break
+        if msg == "bb_quarterMinOne":
+            bb_quarter -= 1
+            bb_quart= str(bb_quarter)
+            if(bb_quarter > 4):
+                bb_quart= "OT"
+                bb_quarter =5
+            if(bb_quarter < 1):
+                bb_quarter =1
+                bb_quart= bb_quarter
+            BB_quarter.config(text=bb_quart)
+            basketball_restartTime()
+            break
+        if msg[:9] == "Game_time":
+            bb_minutes= int(msg[9:])
+            BB_gclock.config(text="%d : 00" % (bb_minutes))
+            #print(bb_minutes)
+            break
+        
+        print(bb_p1_name, bb_p2_name, bb_p1_score, bb_p2_score, bb_p1_foul, bb_p2_foul, bb_p1_timeout, bb_p2_timeout, bb_sclock, bb_mins, bb_secs, bb_quarter)
+       
+        query = """INSERT INTO basketball_db (name1, name2, score1, score2, foul1, foul2, timeout1 , timeout2 , shotclock , gameclock_min, gameclock_sec, quarter) VALUES ("{}", "{}", {}, {}, {}, {}, {}, {}, {}, {}, {}, {});"""
+        curs.execute(query.format(bb_p1_name, bb_p2_name, bb_p1_score, bb_p2_score, bb_p1_foul, bb_p2_foul, bb_p1_timeout, bb_p2_timeout, bb_sclock, bb_mins, bb_secs, bb_quarter))
+        curs.execute("COMMIT;")
+        break
+
+    
+def Volley_CheckInput(CurrentSport, msg):
+    global vb_p1_name, vb_p1_score, vb_p1_setwon, vb_p1_timeout, vb_p2_name, vb_p2_score, vb_p2_setwon, vb_p2_timeout, vb_quarter
+
+    while CurrentSport == "volleyball":
+        if msg == "vb_p1_timeoutMinOne":
+            vb_p1_timeout -= 1
+            if vb_p1_timeout < 0:
+                vb_p1_timeout= 0
+            VB_player1_timeout.config(text=vb_p1_timeout)
+            break
+        if msg == "vb_p2_timeoutMinOne":
+            vb_p2_timeout -= 1
+            if vb_p2_timeout < 0:
+                vb_p2_timeout= 0
+            VB_player2_timeout.config(text=vb_p2_timeout)
+            break
+        if msg == "vb_p1_scorePlusOne":
+            vb_p1_score += 1
+            if vb_p1_score >50:
+                vb_p1_score = 50
+            VB_player1_score.config(text=vb_p1_score)
+            break
+        if msg == "vb_p1_scoreMinusOne":
+            vb_p1_score -= 1
+            if vb_p1_score < 0:
+                vb_p1_score= 0
+            VB_player1_score.config(text=vb_p1_score)
+            break
+        if msg == "vb_p2_scorePlusOne":
+            vb_p2_score += 1
+            if vb_p2_score >50:
+                vb_p2_score = 50
+            VB_player2_score.config(text=vb_p2_score)
+            break
+        if msg == "vb_p2_scoreMinusOne":
+            vb_p2_score -= 1
+            if vb_p2_score < 0:
+                vb_p2_score= 0
+            VB_player2_score.config(text=vb_p2_score)
+            break
+        if msg == "vb_p1_timeoutPlusOne":
+            vb_p1_timeout += 1
+            VB_player1_timeout.config(text=vb_p1_timeout)
+            break
+        if msg == "vb_p2_timeoutPlusOne":
+            vb_p2_timeout += 1
+            VB_player2_timeout.config(text=vb_p2_timeout)
+            break
+        if msg[:16] == "vb_timeout_input":
+            vb_p1_timeout = int(msg[16:])
+            vb_p2_timeout = int(msg[16:])
+            VB_player1_timeout.config(text=vb_p1_timeout)
+            VB_player2_timeout.config(text=vb_p2_timeout)
+            break
+        
+        if msg == "vb_p2_setwonPlusOne" or msg == "vb_p1_setwonPlusOne":
+            if msg == "vb_p1_setwonPlusOne":
+                vb_p1_setwon += 1
+                VB_player1_setwon.config(text=vb_p1_setwon)
+                
+            if msg == "vb_p2_setwonPlusOne":
+                vb_p2_setwon += 1
+                VB_player2_setwon.config(text=vb_p2_setwon)
+                
+            if vb_quarter==1:
+                VB_p1_s1.config(text=vb_p1_score)
+                VB_p2_s1.config(text=vb_p2_score)
+            if vb_quarter==2:
+                VB_p1_s2.config(text=vb_p1_score)
+                VB_p2_s2.config(text=vb_p2_score)
+            if vb_quarter==3:
+                VB_p1_s3.config(text=vb_p1_score)
+                VB_p2_s3.config(text=vb_p2_score)
+            if vb_quarter==4:
+                VB_p1_s4.config(text=vb_p1_score)
+                VB_p2_s4.config(text=vb_p2_score)
+            if vb_quarter==5:
+                VB_p1_s5.config(text=vb_p1_score)
+                VB_p2_s5.config(text=vb_p2_score)
+                
+                
+            vb_quarter += 1
+            VB_set.config(text=vb_quarter)
+            vb_p1_score = 0
+            VB_player1_score.config(text=vb_p1_score)
+            vb_p2_score = 0
+            VB_player2_score.config(text=vb_p2_score)
+            break
+        if msg[:10] == "vb_p1_name":
+            vb_p1_name = msg[10:]
+            VB_player1_name.config(text=vb_p1_name)
+            break
+        if msg[:10] == "vb_p2_name":
+            vb_p2_name = msg[10:]
+            VB_player2_name.config(text=vb_p2_name)
+            break
+        if msg == "vb_setPlusOne":
+            vb_quarter += 1
+            VB_set.config(text=vb_quarter)
+            break
+        if msg == "vb_cLearSetTimOut":
+            vb_quarter = 1
+            VB_set.config(text=vb_quarter)
+            vb_p1_setwon = 0
+            VB_player1_setwon.config(text=vb_p1_setwon)
+            vb_p2_setwon = 0
+            VB_player2_setwon.config(text=vb_p2_setwon)
+            break
+        if msg == "vb_ClearAllDis":
+            vb_quarter = 1
+            VB_set.config(text=vb_quarter)
+            vb_p1_setwon = 0
+            VB_player1_setwon.config(text=vb_p1_setwon)
+            vb_p2_setwon = 0
+            VB_player2_setwon.config(text=vb_p2_setwon)
+            vb_p1_score =0
+            VB_player1_score.config(text=vb_p1_score)
+            vb_p2_score =0
+            VB_player2_score.config(text=vb_p2_score)
+            vb_p2_timeout = 0
+            VB_player2_timeout.config(text=vb_p2_timeout)
+            vb_p1_timeout = 0
+            VB_player1_timeout.config(text=vb_p1_timeout)
+            VB_p1_s1.config(text=vb_p1_score)
+            VB_p2_s1.config(text=vb_p2_score)
+            VB_p1_s2.config(text=vb_p1_score)
+            VB_p2_s2.config(text=vb_p2_score)
+            VB_p1_s3.config(text=vb_p1_score)
+            VB_p2_s3.config(text=vb_p2_score)
+            VB_p1_s4.config(text=vb_p1_score)
+            VB_p2_s4.config(text=vb_p2_score)
+            VB_p1_s5.config(text=vb_p1_score)
+            VB_p2_s5.config(text=vb_p2_score)
+                
+            break
+        else:
+            break
+
+def Badmin_CheckInput(CurrentSport, msg):
+    global bd_p1_name, bd_p1_score, bd_p1_setwon, bd_p2_name, bd_p2_score, bd_p2_setwon, bd_quarter
+    
+    while CurrentSport == "badminton":
+        if msg == "bd_p1_scorePlusOne":
+            bd_p1_score += 1
+            BD_player1_score.config(text=bd_p1_score)
+            break
+        if msg == "bd_p1_scoreMinusOne":
+            bd_p1_score -= 1
+            BD_player1_score.config(text=bd_p1_score)
+            break
+        if msg == "bd_p2_scorePlusOne":
+            bd_p2_score += 1
+            BD_player2_score.config(text=bd_p2_score)
+            break
+        if msg == "bd_p2_scoreMinusOne":
+            bd_p2_score -= 1
+            BD_player2_score.config(text=bd_p2_score)
+            break
+        if msg == "bd_p1_setwonPlusOne":
+            bd_p1_setwon += 1
+            BD_player1_setwon.config(text=bd_p1_setwon)
+            break
+        if msg == "bd_p2_setwonPlusOne":
+            bd_p2_setwon += 1
+            BD_player2_setwon.config(text=bd_p2_setwon)
+            break
+        if msg[:10] == "bd_p1_name":
+            bd_p1_name = msg[10:]
+            BD_player1_name.config(text=bd_p1_name)
+            break
+        if msg[:10] == "bd_p3_name":
+            bd_p2_name = msg[10:]
+            BD_player2_name.config(text=bd_p2_name)
+            break
+        if msg[:10] == "bd_p2_name":
+            bd_p1b_name = msg[10:]
+            BD_player1b_name.config(text=bd_p1b_name)
+            break
+        if msg[:10] == "bd_p4_name":
+            bd_p2b_name = msg[10:]
+            BD_player2b_name.config(text=bd_p2b_name)
+            break
+        if msg == "bd_setPlusOne":
+            bd_quarter += 1
+            BD_set.config(text=bd_quarter)
+            break
+        else:
+            break
+            
+def badmintonUI():
+    # this is the child window
+    global board, boardisPresent, BD_player1_name, BD_player1_score, BD_player1_setwon, BD_player2_name, BD_player2_score, BD_player2_setwon, BD_set, BD_player1b_name, BD_player2b_name
+    while boardisPresent == True:
+        board = tk.Toplevel()
+        board.attributes('-fullscreen', True)
+        board.title("Window 2")
+        boardisPresent = False  # NAA NA NI POP UP
+
+        # root.destroy()
+        # board = tk.Tk()
+        global BD_player1_score
+        bg_color = 'black'
+        
+        '''Badminton Layout'''
+        bd_top_frame = tk.Frame(board, bg=bg_color, width=1000, height=1900)
+        bd_center = tk.Frame(board, bg=bg_color, width=700, height=1900)
+        
+        bd_top_frame.grid(row=1, sticky="nsew")
+        bd_center.grid(row=2, sticky="nsew")
+        # top_frame.grid_rowconfigure(2, weight=1)
+        # top_frame.grid_columnconfigure(1, weight=1)
+        
+        # create the widgets for the top frame
+        BD_player1_name = tk.Label(bd_top_frame, text=bd_p1_name, bg=bg_color, fg='blue', font=("Franklin Gothic Heavy", 85))
+        BD_player2_name = tk.Label(bd_top_frame, text=bd_p2_name, bg=bg_color, fg='red', font=("Franklin Gothic Heavy", 85))
+        
+        BD_player1b_name = tk.Label(bd_top_frame, text=bd_p1b_name, bg=bg_color, fg='blue', font=("Franklin Gothic Heavy", 85))
+        BD_player2b_name = tk.Label(bd_top_frame, text=bd_p2b_name, bg=bg_color, fg='red', font=("Franklin Gothic Heavy", 85))
+        
+        BD_player1_score = tk.Label(bd_top_frame, text=bd_p1_score, bg=bg_color, fg='blue', font=("Arial", 130))
+        BD_player2_score = tk.Label(bd_top_frame, text=bd_p2_score, bg=bg_color, fg='red', font=("Arial", 130))
+        
+        BD_label3 = tk.Label(bd_top_frame, text="SET", bg=bg_color, fg='white', font=("Franklin Gothic Heavy", 55))
+        BD_set = tk.Label(bd_top_frame, text=bd_quarter, bg=bg_color, fg='DarkGoldenrod1', font=("Arial", 100))
+        BD_label4 = tk.Label(bd_top_frame, text="   SET WON   ", bg=bg_color, fg='white', font=("Franklin Gothic Heavy", 35))
+        BD_player1_setwon = tk.Label(bd_top_frame, text=bd_p1_setwon, bg=bg_color, fg='blue', font=("Arial", 70))
+        #BD_label5 = tk.Label(bd_top_frame, text="    SET WON  ", bg=bg_color, fg='white', font=("Franklin Gothic Heavy", 40))
+        BD_player2_setwon = tk.Label(bd_top_frame, text=bd_p2_setwon, bg=bg_color, fg='red', font=("Arial", 70))
+        BD_empty1 = tk.Label(bd_top_frame, text="", bg=bg_color, fg='blue', font=("Franklin Gothic Heavy", 100))
+        BD_empty1.grid(row=0, column=0, sticky="ns")
+        
+        # layout the widgets in the top frame
+        #BD_empty1.grid(row=0, column=0, sticky="ns")
+        BD_player1_name.grid(row=0, column=0, sticky="ns")
+        BD_player2_name.grid(row=0, column=4, sticky="ns")
+        BD_player1b_name.grid(row=1, column=0, sticky="ns")
+        BD_player2b_name.grid(row=1, column=4, sticky="ns")
+        BD_player1_score.grid(row=2, column=0, sticky="ns")
+        BD_player2_score.grid(row=2, column=4, sticky="ns")
+        
+        BD_label3.grid(row=1, column=1, sticky="s", columnspan=2)
+        BD_set.grid(row=2, column=1, sticky="n", columnspan=2)
+        BD_label4.grid(row=2, column=1, sticky="s", columnspan=2)
+        BD_player1_setwon.grid(row=3, column=1, sticky="n")
+        #BD_label5.grid(row=1, column=3, sticky="s")
+        BD_player2_setwon.grid(row=3, column=2, sticky="n")
+        
+        #bd_p1b_name = ""
+
+def basketUI():
+    global BB_gclock, BB_sclock, bb_top_frame, bb_center, bb_boardisPresent, top, BB_player1_name, BB_player1_foul, BB_player2_name, BB_player2_foul, BB_quarter, BB_player1_timeout, BB_player2_timeout, BB_player1_score, BB_player2_score
+    
+    while bb_boardisPresent == True:
+        top = tk.Toplevel()
+        top.attributes('-fullscreen', True)
+        top.title("Window 2")
+        bb_boardisPresent = False
+    
+        background_basket = 'black'
+        bb_font_scores = ("Arial", 35, "bold")
+        
+        bb_top_frame = tk.Frame(top, bg=background_basket, width=600, height=1900)
+        bb_center = tk.Frame(top, bg=background_basket, width=600, height=1900)
+        
+        # layout all of the main containers
+        top.grid_rowconfigure(1, weight=1)
+        top.grid_columnconfigure(0, weight=1)
+        
+        bb_top_frame.grid(row=0, sticky="nsew")
+        bb_center.grid(row=1, sticky="nsew")
+        
+        bb_top_frame.grid_rowconfigure(0, weight=1)
+        bb_top_frame.grid_columnconfigure(1, weight=1)
+        
+        # create the widgets for the top frame
+        BB_player1_name = tk.Label(bb_top_frame, text=bb_p1_name, bg=background_basket, fg='blue', font=("Franklin Gothic Heavy", 70))
+        BB_player2_name = tk.Label(bb_top_frame, text=bb_p2_name, bg=background_basket, fg='red', font=("Franklin Gothic Heavy", 70))
+        BB_label1 = tk.Label(bb_top_frame, text="GAME CLOCK", bg=background_basket, fg='magenta', font=("Franklin Gothic Heavy", 50, "bold"))
+        BB_player1_score = tk.Label(bb_top_frame, text=bb_p1_score, bg=background_basket, fg='blue', font=("Arial", 160))
+        BB_player2_score = tk.Label(bb_top_frame, text=bb_p2_score, bg=background_basket, fg='red', font=("Arial", 160))
+        BB_gclock = tk.Label(bb_top_frame, text="00:00", bg=background_basket, width=10,  fg='cyan', font=("Arial", 100))
+        BB_label3 = tk.Label(bb_top_frame, text="QUARTER", bg=background_basket, fg='magenta', font=("Franklin Gothic Heavy", 50))
+        BB_quarter = tk.Label(bb_top_frame, text=bb_quarter, bg=background_basket, width=10, fg='DarkGoldenrod1', font=("Arial", 60))
+        BB_label2 = tk.Label(bb_top_frame, text="SHOT CLOCK", bg=background_basket, fg='magenta', font=("Franklin Gothic Heavy", 50))
+        #BB_sclock = tk.Label(bb_top_frame, text="00", bg=background_basket, width=10, fg='DarkGoldenrod1', font=("Arial", 60))
+        BB_label4 = tk.Label(bb_top_frame, text="FOULS", bg=background_basket, fg='magenta', font=("Franklin Gothic Heavy", 50))
+        BB_player1_foul = tk.Label(bb_top_frame, text=bb_p1_foul, bg=background_basket, fg='blue', font=("Arial", 70))
+        BB_label5 = tk.Label(bb_top_frame, text="FOULS", bg=background_basket, fg='magenta', font=("Franklin Gothic Heavy", 50))
+        BB_player2_foul = tk.Label(bb_top_frame, text=bb_p2_foul, bg=background_basket, fg='red', font=("Arial", 70))
+        
+        # layout the widgets in the top frame
+        BB_player1_name.grid(row=0, column=0, sticky="ns")
+        BB_label1.grid(row=0, column=1, sticky="sew")
+        BB_player2_name.grid(row=0, column=2, sticky="ns")
+        BB_player1_score.grid(row=1, column=0, sticky="ns", rowspan=2)
+        BB_gclock.grid(row=1, column=1, sticky="n")
+        BB_player2_score.grid(row=1, column=2, sticky="s", rowspan=2)
+        BB_label3.grid(row=2, column=1, sticky="n")
+        BB_quarter.grid(row=3, column=1, sticky="new")
+        BB_label2.grid(row=4, column=1, sticky="n")
+        #BB_sclock.grid(row=5, column=1, sticky="n")
+        BB_label4.grid(row=3, column=0, sticky="s")
+        BB_player1_foul.grid(row=4, column=0, sticky="n")
+        BB_label5.grid(row=3, column=2, sticky="s")
+        BB_player2_foul.grid(row=4, column=2, sticky="n")
+        
+        # create the center widgets
+        #bb_center.grid_rowconfigure(0, weight=1)
+        # center.grid_columnconfigure(1, weight=1)
+
+        BB_sclock = tk.Label(bb_top_frame, text="00", bg=background_basket, width=10, fg='DarkGoldenrod1', font=("Arial", 70))
+
+        BB_label6 = tk.Label(bb_top_frame, text="       TIMEOUT LEFT       ", bg=background_basket, fg='limegreen', font=("Franklin Gothic Heavy", 35, "bold"))
+        BB_player1_timeout = tk.Label(bb_top_frame, text=bb_p1_timeout, bg=background_basket, fg='blue', font=("Arial",55, "bold"))
+        BB_player2_timeout = tk.Label(bb_top_frame, text=bb_p2_timeout, bg=background_basket, fg='red', font=("Arial", 55, "bold"))
+        BB_extralabel = tk.Label(bb_center, text="                                ", bg=background_basket, fg='white', font=("Franklin Gothic Heavy", 40))
+        #BB_label7 = tk.Label(bb_center, text="TIMEOUT LEFT", bg=background_basket, fg='limegreen', font=("Franklin Gothic Heavy", 35, "bold"))
+
+
+        BB_sclock.grid(row=5, column=1, sticky="n")
+        BB_label6.grid(row=6, column=1, sticky="ns")
+        #BB_label7.grid(row=1, column=3, sticky="ns")
+        BB_player1_timeout.grid(row=6, column=0, sticky="e")
+        BB_extralabel.grid(row=1, column=1, sticky="ne")
+        BB_player2_timeout.grid(row=6, column=2, sticky="w")
+        
+        remaining = 0
+        #shotclocktime()  # run shotclock
+        #gameclocktime()  # run gameclock
+
+def gameclocktime():
+    global bb_gclock_mins, bb_gclock_secs, bb_state, bb_mins, bb_secs, bb_minutes, bb_seconds, input_done
+    bb_state = True
+    bb_mins = bb_gclock_mins
+    bb_secs = bb_gclock_secs
+    countdown()
+
+def countdown():
+    basketUI()
+    global bb_state, bb_minutes, bb_seconds, bb_mins, bb_secs
+    if bb_state == True:
+        if bb_secs < 10:
+            if bb_mins < 10:
+                BB_gclock.config(text="0%d : 0%d" % (bb_mins, bb_secs))
+            else:
+                BB_gclock.config(text="%d : 0%d" % (bb_mins, bb_secs))
+        else:
+            if bb_mins < 10:
+                BB_gclock.config(text="0%d : %d" % (bb_mins, bb_secs))
+            else:
+                BB_gclock.config(text="%d : %d" % (bb_mins, bb_secs))
+        
+        if (bb_mins == 0) and (bb_secs == 0):
+            BB_gclock.config(text="00:00")
+        else:
+            if bb_secs == 0:
+                bb_mins -= 1
+                bb_secs = 59
+            else:
+                bb_secs -= 1
+            
+            #insert data on database
+            query = """INSERT INTO basketball_db (name1, name2, score1, score2, foul1, foul2, timeout1 , timeout2 , shotclock , gameclock_min, gameclock_sec, quarter) VALUES ("{}", "{}", {}, {}, {}, {}, {}, {}, {}, {}, {}, {});"""
+            curs.execute(query.format(bb_p1_name, bb_p2_name, bb_p1_score, bb_p2_score, bb_p1_foul, bb_p2_foul, bb_p1_timeout, bb_p2_timeout, bb_sclock, bb_mins, bb_secs, bb_quarter))
+            curs.execute("COMMIT;")
+
+            top.after(1000, countdown)
+            
+    while bb_state == False:
+        bb_minutes = bb_mins  # can be used in pause and play
+        bb_seconds = bb_secs
+        basketUI()
+        BB_gclock.config(text="%d : %d" % (bb_mins, bb_secs))
+        break
+
+def basketball_start():
+    global bb_state, bb_minutes, bb_seconds, bb_mins, bb_secs
+    if bb_state is False:
+        bb_state = True
+        bb_mins = bb_minutes
+        bb_secs = bb_seconds
+        #gameclocktime()
+        countdown()
+
+def basketball_pause():
+    global bb_state, bb_minutes, bb_seconds, bb_secs, bb_mins
+    if bb_state == True:
+        bb_state = False
+    countdown()
+    
+def basketball_restartTime():
+    global bb_mins, bb_secs, bb_gclock_mins, bb_gclock_secs
+    bb_mins= bb_gclock_mins
+    bb_secs= bb_gclock_secs
+   
+    time.sleep(3)
+
+def shotclocktime():
+    global bb_sclock, sclock_state
+    #basketUI()
+    
+    if bb_sclock > 0:
+        sclock_state= True
+        bb_sclock -= 1
+        BB_sclock['text'] = bb_sclock
+        top.after(1000, shotclocktime)
+    else:
+        sclock_state= False
+
+def volleyballUI():
+    global vbboard, vb_boardisPresent, VB_player1_name, VB_player1_score, VB_player1_setwon, VB_player1_timeout, VB_player2_name, VB_player2_score, VB_player2_setwon, VB_player2_timeout, VB_set, VB_p1_s1, VB_p1_s2, VB_p1_s3, VB_p1_s4, VB_p1_s5, VB_p2_s1, VB_p2_s2, VB_p2_s3, VB_p2_s4, VB_p2_s5
+    
+    if vb_boardisPresent == True:
+        vbboard = tk.Toplevel()
+        vbboard.attributes('-fullscreen', True)
+        vb_boardisPresent = False
+        
+        background_volley = 'black'
+        VB_toppest_frame = tk.Frame(vbboard, bg=background_volley, width=800, height=1900)
+        VB_top_frame = tk.Frame(vbboard, bg=background_volley, width=800, height=1900)
+        VB_center = tk.Frame(vbboard, bg=background_volley, width=800, height=1900)
+        
+        # layout all of the main containers
+        vbboard.grid_rowconfigure(2, weight=1)
+        #vbboard.grid_columnconfigure(0, weight=1)
+        
+        VB_toppest_frame.grid(row=1, sticky="nsew")
+        VB_top_frame.grid(row=0, sticky="nsew")
+        VB_center.grid(row=2, sticky="nsew")
+    
+        #VB_toppest_frame.grid_rowconfigure(0, weight=1)
+        #VB_toppest_frame.grid_columnconfigure(1, weight=1)
+        
+        #VB_gclock = tk.Label(VB_toppest_frame, text="", bg=background_volley, width=10, fg='DarkGoldenrod1', font=("Arial", 70, "bold"))
+        #VB_gclock.grid(row=0, column=1, sticky="n")
+    
+        VB_top_frame.grid_rowconfigure(0, weight=1)
+        
+        # create the widgets for the top frame
+        VB_player1_name = tk.Label(VB_top_frame, text=vb_p1_name, bg=background_volley, fg='blue', font=("Franklin Gothic Heavy", 85, "bold"))
+        VB_player2_name = tk.Label(VB_top_frame, text=vb_p2_name, bg=background_volley, fg='red', font=("Franklin Gothic Heavy", 85, "bold"))
+        VB_player1_score = tk.Label(VB_top_frame, text=vb_p1_score, bg=background_volley, fg='blue', font=("Arial", 135, "bold"))
+        VB_player2_score = tk.Label(VB_top_frame, text=vb_p2_score, bg=background_volley, fg='red', font=("Arial", 135, "bold"))
+        VB_label3 = tk.Label(VB_toppest_frame, text="   SET   ", bg=background_volley, fg='magenta', font=("Franklin Gothic Heavy", 50, "bold"))
+        VB_set = tk.Label(VB_toppest_frame, text=vb_quarter, bg=background_volley, fg='DarkGoldenrod1', font=("Arial", 70, "bold"))
+        VB_label4 = tk.Label(VB_top_frame, text=" SET WON ", bg=background_volley, fg='magenta', font=("Franklin Gothic Heavy", 50, "bold"))
+        VB_player1_setwon = tk.Label(VB_top_frame, text=vb_p1_setwon, bg=background_volley, fg='blue', font=("Arial", 70, "bold"))
+        VB_player2_setwon = tk.Label(VB_top_frame, text=vb_p2_setwon, bg=background_volley, fg='red', font=("Arial", 70, "bold"))
+        
+        VB_p1_s1 = tk.Label(VB_toppest_frame, text=vb_p1_score_s1, bg=background_volley, fg='red', font=("Arial", 40, "bold"))
+        VB_p1_s2 = tk.Label(VB_toppest_frame, text=vb_p1_score_s2, bg=background_volley, fg='red', font=("Arial", 40, "bold"))
+        VB_p1_s3 = tk.Label(VB_toppest_frame, text=vb_p1_score_s3, bg=background_volley, fg='red', font=("Arial", 40, "bold"))
+        VB_p1_s4 = tk.Label(VB_toppest_frame, text=vb_p1_score_s4, bg=background_volley, fg='red', font=("Arial", 40, "bold"))
+        VB_p1_s5 = tk.Label(VB_toppest_frame, text=vb_p1_score_s5, bg=background_volley, fg='red', font=("Arial", 40, "bold"))
+        
+        VB_label5 = tk.Label(VB_toppest_frame, text="S1: ", bg=background_volley, fg='magenta', font=("Franklin Gothic Heavy", 40))
+        VB_label6 = tk.Label(VB_toppest_frame, text=" S2: ", bg=background_volley, fg='magenta', font=("Franklin Gothic Heavy", 40))
+        VB_label7 = tk.Label(VB_toppest_frame, text=" S3: ", bg=background_volley, fg='magenta', font=("Franklin Gothic Heavy", 40))
+        VB_label8 = tk.Label(VB_toppest_frame, text="S4: ", bg=background_volley, fg='magenta', font=("Franklin Gothic Heavy", 40))
+        VB_label9 = tk.Label(VB_toppest_frame, text=" S5: ", bg=background_volley, fg='magenta', font=("Franklin Gothic Heavy", 40))
+        
+        VB_p2_s1 = tk.Label(VB_toppest_frame, text=vb_p2_score_s1, bg=background_volley, fg='blue', font=("Arial", 40, "bold"))
+        VB_p2_s2 = tk.Label(VB_toppest_frame, text=vb_p2_score_s2, bg=background_volley, fg='blue', font=("Arial", 40, "bold"))
+        VB_p2_s3 = tk.Label(VB_toppest_frame, text=vb_p2_score_s3, bg=background_volley, fg='blue', font=("Arial", 40, "bold"))
+        VB_p2_s4 = tk.Label(VB_toppest_frame, text=vb_p2_score_s4, bg=background_volley, fg='blue', font=("Arial", 40, "bold"))
+        VB_p2_s5 = tk.Label(VB_toppest_frame, text=vb_p2_score_s5, bg=background_volley, fg='blue', font=("Arial", 40, "bold"))
+        
+        VB_label10 = tk.Label(VB_toppest_frame, text="S1: ", bg=background_volley, fg='cyan', font=("Franklin Gothic Heavy", 40))
+        VB_label11 = tk.Label(VB_toppest_frame, text=" S2: ", bg=background_volley, fg='cyan', font=("Franklin Gothic Heavy", 40))
+        VB_label12 = tk.Label(VB_toppest_frame, text=" S3: ", bg=background_volley, fg='cyan', font=("Franklin Gothic Heavy", 40))
+        VB_label13 = tk.Label(VB_toppest_frame, text="S4: ", bg=background_volley, fg='cyan', font=("Franklin Gothic Heavy", 40))
+        VB_label14 = tk.Label(VB_toppest_frame, text=" S5: ", bg=background_volley, fg='cyan', font=("Franklin Gothic Heavy", 40))
+        # layout the widgets in the top frame
+        
+        VB_player1_name.grid(row=1, column=0, sticky="nsew")
+        VB_player2_name.grid(row=1, column=3, sticky="nsew")
+        VB_player1_score.grid(row=2, column=0, sticky="ns")
+        VB_player2_score.grid(row=2, column=3, sticky="ns")
+        VB_label4.grid(row=1, column=1, sticky="s", columnspan=2)
+        VB_player1_setwon.grid(row=2, column=1, sticky="n")
+        VB_player2_setwon.grid(row=2, column=2, sticky="n")
+        
+        VB_label3.grid(row=0, column=6, sticky="n", rowspan=2)
+        VB_set.grid(row=1, column=6, sticky="n")
+        
+        VB_label5.grid(row=0, column=0, sticky="")
+        VB_label6.grid(row=0, column=2, sticky="")
+        VB_label7.grid(row=0, column=4, sticky="")
+        VB_label8.grid(row=1, column=0, sticky="")
+        VB_label9.grid(row=1, column=2, sticky="")
+        
+        VB_p1_s1.grid(row=0, column=1, sticky="")
+        VB_p1_s2.grid(row=0, column=3, sticky="")
+        VB_p1_s3.grid(row=0, column=5, sticky="")
+        VB_p1_s4.grid(row=1, column=1, sticky="")
+        VB_p1_s5.grid(row=1, column=3, sticky="")
+        
+        VB_label10.grid(row=0, column=7, sticky="")
+        VB_label11.grid(row=0, column=9, sticky="")
+        VB_label12.grid(row=0, column=11, sticky="")
+        VB_label13.grid(row=1, column=7, sticky="")
+        VB_label14.grid(row=1, column=9, sticky="")
+        
+        VB_p2_s1.grid(row=0, column=8, sticky="")
+        VB_p2_s2.grid(row=0, column=10, sticky="")
+        VB_p2_s3.grid(row=0, column=12, sticky="")
+        VB_p2_s4.grid(row=1, column=8, sticky="")
+        VB_p2_s5.grid(row=1, column=10, sticky="")
+        
+        # create the center widgets
+        VB_center.grid_rowconfigure(0, weight=1)
+        # center.grid_columnconfigure(1, weight=1)
+    
+        VB_label6 = tk.Label(VB_center, text=" TIMEOUT LEFT ", bg=background_volley, fg='white', font=("Franklin Gothic Heavy", 45))
+        VB_player1_timeout = tk.Label(VB_center, text=vb_p1_timeout, bg=background_volley, fg='blue', font=("Arial", 50, "bold"))
+        VB_player2_timeout = tk.Label(VB_center, text=vb_p2_timeout, bg=background_volley, fg='red', font=("Arial", 50, "bold"))
+        VB_extralabel = tk.Label(VB_center, text="                               ", bg=background_volley, fg='white', font=("Franklin Gothic Heavy", 40, "bold"))
+        
+        VB_label6.grid(row=0, column=3, sticky="w")
+        VB_player1_timeout.grid(row=0, column=2, sticky="w")
+        VB_extralabel.grid(row=0, column=1, sticky="e")
+        VB_player2_timeout.grid(row=0, column=4, sticky="")
+    
+
+#os.chdir("/home/pi/rpi-fb-matrix")
+#subprocess.call("sudo ./rpi-fb-matrix --led-multiplexing=3 --led-slowdown-gpio=4 --led-no-hardware-pulse matrix.cfg")
+# this is the main/root window
+root = tk.Tk()
+root.attributes('-fullscreen', True)
+root_frame = tk.Frame(root, bg='black', width=500, height=1900)
+root_frame.pack()
+#label = tk.Label(root_frame, text=" SCORED ", bg='black', fg='white', font=("Franklin Gothic Heavy", 250))
+#label.pack()
+#label1 = tk.Label(root_frame, text=" SCORED ", bg='black', fg='black', font=("Franklin Gothic Heavy", 300))
+#label1.pack()
+background_image = tk.PhotoImage(file='ICON2.png')      #bg image
+background_label = tk.Label(root, image=background_image)
+background_label.place(x=0, y=0, relwidth=1, relheight=1)
+background_label.photo = background_image
+#label1 = tk.Label(root_frame, text=" SCORED ", bg='black', fg='black', font=("Franklin Gothic Heavy", 100))
+#label1.place(x=0.1, y=0.1)
+# root.title("Window 1")
+
+selectsport = ['basketball', 'volleyball', 'badminton', 'MainMenu']
+vb_choice= ['vb_p1_scorePlusOne', 'vb_p1_scoreMinusOne', 'vb_p2_scorePlusOne', 'vb_p2_scoreMinusOne', 'vb_p1_timeoutPlusOne', 'vb_p2_timeoutPlusOne', 'vb_p1_setwonPlusOne', 'vb_p2_setwonPlusOne', 'vb_p1_name', 'vb_p2_name', 'vb_setPlusOne', 'vb_cLearSetTimOut', 'vb_ClearAllDis', 'vb_p2_timeoutMinOne', 'vb_p1_timeoutMinOne', 'vb_timeout_input'] #14
+bb_choice= ['bb_p1_scorePlusOne', 'bb_p2_scorePlusOne', 'bb_p1_timeoutPlusOne', 'bb_p2_timeoutPlusOne', 'bb_p1_foulPlusOne', 'bb_p2_foulPlusOne', 'bb_quarterPlusOne', 'bb_p1_name', 'bb_p2_name', 'basket_pause', 'Start_Game', 'bb_p1_scorePlusTwo', 'bb_p1_scorePlusThree', 'bb_p2_scorePlusTwo', 'bb_p2_scorePlusThree', 'shotclock_14', 'shotclock_24', 'bb_quarterMinOne', 'bb_timeout_input', 'Game_time', 'bb_p1_Clear', 'Stop_Time'] #20
+bd_choice= ['bd_p1_scorePlusOne', 'bd_p1_scoreMinusOne', 'bd_p2_scorePlusOne', 'bd_p2_scoreMinusOne', 'bd_p1_setwonPlusOne' , 'bd_p2_setwonPlusOne', 'bd_p1_name', 'bd_p2_name', 'bd_p3_name', 'bd_p4_name', 'bd_setPlusOne' ]#10
+clients = {}
+addresses = {}
+
+HOST = ''
+PORT = 21567
+BUFSIZ = 1024
+ADDR = (HOST, PORT)
+
+SERVER = socket(AF_INET, SOCK_STREAM)
+SERVER.bind(ADDR)
+#os.chdir("/home/pi/rpi-fb-matrix")
+#os.system("sudo ./rpi-fb-matrix --led-multiplexing=3 --led-slowdown-gpio=4 --led-no-hardware-pulse matrix.cfg")
+#import samp5
+
+
+if __name__ == "__main__":
+    SERVER.listen(5)
+    print("Waiting for connection...")
+    ACCEPT_THREAD = Thread(target=accept_incoming_connections)
+    ACCEPT_THREAD.start()
+    root.mainloop()  # Starts GUI execution.
+    #os.system('python ledpanelscript.py')
+    # ACCEPT_THREAD.join()
+    SERVER.close()
